@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'strscan'
-
 module RuboCop
   module Cop
     module YARD
@@ -49,12 +47,18 @@ module RuboCop
         include ConfigurableEnforcedStyle
         extend AutoCorrector
 
-        # The name the long style writes before each collection's opening token.
-        COLLECTION_NAMES = {
-          collection_start: 'Array',
-          fixed_collection_start: 'Array',
-          hash_collection_start: 'Hash'
-        }.freeze
+        # Names yard gives a collection written without one: `<T>` and `(T)`
+        # are Arrays, `{K => V}` is a Hash.
+        COLLECTION_NAMES = { '<' => 'Array', '(' => 'Array', '{' => 'Hash' }.freeze
+
+        # Splits a type into the parts whose spelling matters: a quoted literal
+        # or duck type, which is left alone; a name with the collection opener
+        # that follows it, if any; or an opener with no name.
+        SPELLING = /
+          (?<skip>'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+))
+          |(?<name>[\w:]+)(?<space>\s*)(?<opener>[<({])?
+          |(?<bare>[<({])
+        /x
 
         def on_new_investigation
           processed_source.comments.each do |comment|
@@ -69,44 +73,75 @@ module RuboCop
 
         def check(comment)
           docstring = ::YARD::DocstringParser.new.parse(comment.text.gsub(/\A#\s*/, ''))
-          each_types_explainer(docstring) do |type, _types_explainer|
-            correct_type = restyle(type)
-            unless correct_type.nil? || type == correct_type
-              add_offense(comment, message: "`#{type}` is using #{bad_style} style syntax") do |corrector|
-                corrector.replace(comment, comment.source.sub(/\[(.*)\]/) { "[#{correct_type}]" })
-              end
+          each_types_explainer(docstring) do |type, types_explainer|
+            next unless wrong_style?(type, types_explainer)
+
+            add_offense(comment, message: "`#{type}` is using #{bad_style} style syntax") do |corrector|
+              corrector.replace(comment, comment.source.sub(/\[(.*)\]/) { "[#{restyle(type)}]" })
             end
           end
         end
 
-        # Adds or removes each collection's name to match the style, leaving
-        # the rest as written: long style turns `(<A> | B)` into
-        # `Array(Array<A> | B)`. Returns nil if yard can't tokenize the type.
-        def restyle(type)
-          scanner = StringScanner.new(type)
-          out = []
-          name_index = nil
-          until scanner.eos?
-            kind, = ::YARD::Tags::TypesExplainer::Parser::TOKENS.find { |_, regexp| regexp && scanner.scan(regexp) }
-            return if kind.nil?
-
-            name = COLLECTION_NAMES[kind]
-            if name
-              if name_index.nil?
-                out << name if style == :long
-              elsif out[name_index] == name && style == :short
-                out[name_index] = ''
-              end
-            end
-
-            if kind == :type_name
-              name_index = out.size
-            elsif kind != :whitespace
-              name_index = nil
-            end
-            out << scanner.matched
+        # yard names `<String>` and `Array<String>` both Array, so the parse
+        # tree gives how many Array and Hash collections there are, and the
+        # source gives how many of them are written with their name.
+        def wrong_style?(type, types_explainer)
+          named = 0
+          type.scan(SPELLING) do
+            match = Regexp.last_match or next
+            named += 1 if match[:opener] && COLLECTION_NAMES.value?(match[:name])
           end
-          out.join
+          if style == :long
+            named < collection_count(types_explainer)
+          else
+            type != restyle(type)
+          end
+        end
+
+        # @return [Integer] the Array and Hash collections in the parse tree
+        def collection_count(types_explainer)
+          case types_explainer
+          when ::YARD::Tags::TypesExplainer::HashCollectionType
+            children = types_explainer.key_value_pairs.flatten
+          when ::YARD::Tags::TypesExplainer::CollectionType
+            children = types_explainer.types
+          else
+            return group_members(types_explainer).sum { collection_count(_1) }
+          end
+          own = COLLECTION_NAMES.value?(types_explainer.name) ? 1 : 0
+          own + children.sum { collection_count(_1) }
+        end
+
+        # GroupType and IntersectionType need yard 0.9.46 or later.
+        def group_members(types_explainer)
+          if defined?(::YARD::Tags::TypesExplainer::GroupType) &&
+             types_explainer.is_a?(::YARD::Tags::TypesExplainer::GroupType)
+            types_explainer.types
+          elsif defined?(::YARD::Tags::TypesExplainer::IntersectionType) &&
+                types_explainer.is_a?(::YARD::Tags::TypesExplainer::IntersectionType)
+            types_explainer.types
+          else
+            []
+          end
+        end
+
+        # Long style names each unnamed collection; short style drops the name
+        # where the bare form means the same (`Array<`, `Array(`, `Hash{`).
+        # Everything else stays as written.
+        def restyle(type)
+          type.gsub(SPELLING) do |text|
+            match = Regexp.last_match or next text
+            bare = match[:bare]
+            name = match[:name]
+            opener = match[:opener]
+            if bare
+              style == :long ? "#{COLLECTION_NAMES.fetch(bare)}#{bare}" : text
+            elsif name && opener && style == :short && COLLECTION_NAMES[opener] == name
+              "#{match[:space]}#{opener}"
+            else
+              text
+            end
+          end
         end
 
         def bad_style

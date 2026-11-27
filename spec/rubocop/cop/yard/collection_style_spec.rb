@@ -75,6 +75,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       expect_no_offenses(<<~RUBY)
         class Foo
           # @param [Array(Symbol, Array([Integer, nil], [Integer, nil]))]
+          # @param [Array(Symbol, String, Array([Integer, nil], [Integer, nil]))]
           # @param [Array(Integer | nil, String)]
           # @param [Array<String | nil>]
           # @param [Foo & Bar]
@@ -90,6 +91,32 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         class Foo
           # @param [Hash<Symbol, String>]
           # @param [Hash{Symbol => String; Integer => Float}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'leaves quoted literals and duck types as written' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array<'a<b', "Hash{x">]
+          # @param [Array<#to_s, #<=>>]
+          # @param [<'a(b'>]
+          ^^^^^^^^^^^^^^^^^^ `<'a(b'>` is using short style syntax
+          # @param [<#[], #<<>]
+          ^^^^^^^^^^^^^^^^^^^^^ `<#[], #<<>` is using short style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [Array<'a<b', "Hash{x">]
+          # @param [Array<#to_s, #<=>>]
+          # @param [Array<'a(b'>]
+          # @param [Array<#[], #<<>]
           def foo
           end
         end
@@ -153,6 +180,64 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
           # @param [(Symbol)]
           # @param [<Symbol>]
           # @param [{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'leaves quoted literals and duck types as written' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array<'a<b', "Hash{x">]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array<'a<b', "Hash{x">` is using long style syntax
+          # @param [Array<#to_s, #<=>>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array<#to_s, #<=>>` is using long style syntax
+          # @param [<'Array(b'>]
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [<'a<b', "Hash{x">]
+          # @param [<#to_s, #<=>>]
+          # @param [<'Array(b'>]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'keeps the name where the short form means something else' do
+      expect_no_offenses(<<~RUBY)
+        class Foo
+          # @param [Hash<Symbol, String>]
+          # @param [Hash(Symbol)]
+          # @param [Array{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'drops names from grouped and union types' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array(Symbol, String, Array([Integer, nil], [Integer, nil]))]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array(Symbol, String, Array([Integer, nil], [Integer, nil]))` is using long style syntax
+          # @param [Array(Integer | nil, String)]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array(Integer | nil, String)` is using long style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [(Symbol, String, ([Integer, nil], [Integer, nil]))]
+          # @param [(Integer | nil, String)]
           def foo
           end
         end

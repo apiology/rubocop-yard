@@ -20,3 +20,7 @@ end
 class YARD::Tags::TypesExplainer::IntersectionType < ::YARD::Tags::TypesExplainer::Type
   attr_accessor types: Array[YARD::Tags::TypesExplainer::t]
 end
+
+class YARD::Tags::TypesExplainer::HashCollectionType
+  attr_accessor key_value_pairs: Array[[Array[YARD::Tags::TypesExplainer::t], Array[YARD::Tags::TypesExplainer::t]]]
+end
