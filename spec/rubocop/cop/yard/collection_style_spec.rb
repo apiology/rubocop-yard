@@ -3,6 +3,10 @@
 require 'spec_helper'
 
 RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
+  # `[A, B]`, `A | B` and `A & B` parse only on yard 0.9.46 and later.
+  GROUP_TYPES = defined?(YARD::Tags::TypesExplainer::GroupType)
+  NEEDS_YARD_0_9_46 = 'needs yard 0.9.46 or later'
+
   context 'when EnforcedStyle is long' do
     let(:cop_config) { { 'EnforcedStyle' => 'long' } }
 
@@ -80,6 +84,39 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         end
       RUBY
     end
+
+    it 'does not register an offense for a named collection yard parses differently' do
+      expect_no_offenses(<<~RUBY)
+        class Foo
+          # @param [Hash<Symbol, String>]
+          # @param [Hash{Symbol => String; Integer => Float}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'autocorrects only the collection name, keeping union spelling', skip: (NEEDS_YARD_0_9_46 unless GROUP_TYPES) do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array(<A> | B, C)]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array(<A> | B, C)` is using short style syntax
+          # @param [[A | <B>] & C]
+          ^^^^^^^^^^^^^^^^^^^^^^^^ `[A | <B>] & C` is using short style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [Array(Array<A> | B, C)]
+          # @param [[A | Array<B>] & C]
+          def foo
+          end
+        end
+      RUBY
+    end
   end
 
   context 'when EnforcedStyle is short' do
@@ -116,6 +153,25 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
           # @param [(Symbol)]
           # @param [<Symbol>]
           # @param [{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'autocorrects only the collection name, keeping union spelling', skip: (NEEDS_YARD_0_9_46 unless GROUP_TYPES) do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [(Symbol, [Array<Integer> | nil])]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `(Symbol, [Array<Integer> | nil])` is using long style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [(Symbol, [<Integer> | nil])]
           def foo
           end
         end

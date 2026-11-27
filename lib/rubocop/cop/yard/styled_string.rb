@@ -38,16 +38,7 @@ module RuboCop
             end
             "#{tname}<#{types_explainer.types.map { styled_string(_1) }.join(', ')}>"
           when ::YARD::Tags::TypesExplainer::Type
-            # GroupType and IntersectionType have no name and need yard 0.9.46 or later.
-            if defined?(::YARD::Tags::TypesExplainer::GroupType) &&
-               types_explainer.is_a?(::YARD::Tags::TypesExplainer::GroupType)
-              "[#{types_explainer.types.map { styled_string(_1) }.join(', ')}]"
-            elsif defined?(::YARD::Tags::TypesExplainer::IntersectionType) &&
-                  types_explainer.is_a?(::YARD::Tags::TypesExplainer::IntersectionType)
-              types_explainer.types.map { styled_string(_1) }.join(' & ')
-            else
-              types_explainer.name
-            end
+            types_explainer.name
           else
             raise "#{types_explainer.class} is not supported"
           end

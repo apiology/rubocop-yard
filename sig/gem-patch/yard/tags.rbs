@@ -11,12 +11,3 @@ class YARD::DocstringParser
   def tags: () -> Array[YARD::Tags::t | YARD::Tags::RefTagList]
           | ...
 end
-
-# Added in yard 0.9.46 for `[A, B]`, `A | B` and `A & B` type syntax.
-class YARD::Tags::TypesExplainer::GroupType < ::YARD::Tags::TypesExplainer::Type
-  attr_accessor types: Array[YARD::Tags::TypesExplainer::t]
-end
-
-class YARD::Tags::TypesExplainer::IntersectionType < ::YARD::Tags::TypesExplainer::Type
-  attr_accessor types: Array[YARD::Tags::TypesExplainer::t]
-end

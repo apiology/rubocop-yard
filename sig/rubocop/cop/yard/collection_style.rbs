@@ -5,15 +5,16 @@ module RuboCop
         include YARD::Helper
         include RangeHelp
         include ConfigurableEnforcedStyle
-        include YARD::StyledString
         extend AutoCorrector
+
+        COLLECTION_NAMES: Hash[Symbol, String]
 
         def on_new_investigation: () -> void
 
         private
 
         def check: (Parser::Source::Comment comment) -> void
-        def normalize_type: (String str) -> String
+        def restyle: (String type) -> String?
         def bad_style: () -> (:short | :long)
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool
       end
