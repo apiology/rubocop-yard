@@ -6,8 +6,8 @@ RSpec.describe RuboCop::Cop::YARD::TagTypeSyntax, :config do
   it 'registers offenses for invalid type syntax' do
     expect_offense(<<~RUBY)
       class Foo
-        # @param [aaa|bbb] foo
-                  ^^^^^^^^ (SyntaxError) invalid character at |
+        # @param [aaa^bbb] foo
+                  ^^^^^^^^ (SyntaxError) invalid character at ^
         # @option bar baz [aaa bbb]
                            ^^^^^^^^ (SyntaxError) expecting END, got name 'bbb'
         # @param [Hash<Symbol=>Object] config
@@ -22,6 +22,7 @@ RSpec.describe RuboCop::Cop::YARD::TagTypeSyntax, :config do
     expect_no_offenses(<<~RUBY)
       class Foo
         # @param [String, Integer] foo
+        # @param [String | Integer] baz
         # @param [Hash{Symbol => Object}] bar
         # @return [Array<String>]
         def foo

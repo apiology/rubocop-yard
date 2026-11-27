@@ -15,8 +15,6 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
                     ^^^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
           # @param [Hash(Symbol, String)]
                     ^^^^^^^^^^^^^^^^^^^^^ `Hash(Key, Value)` is miswritten of `Hash<Key, Value>` in perhaps
-          # @param [Hash<Symbol, String>]
-                    ^^^^^^^^^^^^^^^^^^^^^ `Hash<Key, Value>` is ambiguous syntax
           # @param [Hash<Symbol>]
                     ^^^^^^^^^^^^^ `<Type>` is the collection type syntax.
           def foo
@@ -27,7 +25,6 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
       expect_correction(<<~RUBY)
         class Foo
           # @param [Array(Symbol)]
-          # @param [Hash{Symbol => String}]
           # @param [Hash{Symbol => String}]
           # @param [Hash{Symbol => String}]
           # @param [Array<Symbol>]
@@ -45,6 +42,8 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
           # @param [Array<String>]
           # @param [Range<Integer>]
           # @param [Dict{Symbol => String}]
+          # @param [Hash<Symbol, String>]
+          # @param [Hash<Symbol, {Symbol => Range<Integer>}>]
           def foo
           end
         end
@@ -54,8 +53,8 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
     it 'handles deeply nested types' do
       expect_offense(<<~RUBY)
         class Foo
-          # @param [Hash<Symbol, {Symbol => Range<Integer>}>]
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash<Key, Value>` is ambiguous syntax
+          # @param [Hash(Symbol, {Symbol => Range<Integer>})]
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash(Key, Value)` is miswritten of `Hash<Key, Value>` in perhaps
           def foo
           end
         end
@@ -64,6 +63,28 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
       expect_correction(<<~RUBY)
         class Foo
           # @param [Hash{Symbol => Hash{Symbol => Range<Integer>}}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'keeps grouped and intersection types when autocorrecting' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array{Symbol => [A, B]}]
+                    ^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
+          # @param [Array{Symbol => A & B}]
+                    ^^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [Hash{Symbol => [A, B]}]
+          # @param [Hash{Symbol => A & B}]
           def foo
           end
         end
@@ -81,8 +102,8 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
                     ^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Array{Symbol => String}]
                     ^^^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
-          # @param [Hash<Symbol, String>]
-                    ^^^^^^^^^^^^^^^^^^^^^ `Hash<Key, Value>` is ambiguous syntax
+          # @param [Hash(Symbol, String)]
+                    ^^^^^^^^^^^^^^^^^^^^^ `Hash(Key, Value)` is miswritten of `Hash<Key, Value>` in perhaps
           def foo
           end
         end
