@@ -106,10 +106,11 @@ module RuboCop
           when ::YARD::Tags::TypesExplainer::CollectionType
             children = types_explainer.types
           else
-            return group_members(types_explainer).sum { collection_count(_1) }
+            children = group_members(types_explainer)
+            return children.inject(0) { |total, child| total + collection_count(child) }
           end
           own = COLLECTION_NAMES.value?(types_explainer.name) ? 1 : 0
-          own + children.sum { collection_count(_1) }
+          children.inject(own) { |total, child| total + collection_count(child) }
         end
 
         # GroupType and IntersectionType need yard 0.9.46 or later.
