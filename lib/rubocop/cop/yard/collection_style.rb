@@ -63,7 +63,7 @@ module RuboCop
           docstring = ::YARD::DocstringParser.new.parse(comment.text.gsub(/\A#\s*/, ''))
           each_types_explainer(docstring) do |type, types_explainer|
             correct_type = styled_string(types_explainer)
-            unless ignore_whitespace(type) == ignore_whitespace(correct_type)
+            unless normalize_type(type) == normalize_type(correct_type)
               add_offense(comment, message: "`#{type}` is using #{bad_style} style syntax") do |corrector|
                 corrector.replace(comment, comment.source.sub(/\[(.*)\]/) { "[#{correct_type}]" })
               end
@@ -71,8 +71,10 @@ module RuboCop
           end
         end
 
-        def ignore_whitespace(str)
-          str.tr(' ', '')
+        # yard parses `[A, B]`, `[A | B]` and a tuple slot's `A | B` to the
+        # same GroupType, so group brackets and `|` are not compared.
+        def normalize_type(str)
+          str.delete(' []').tr('|', ',')
         end
 
         def bad_style

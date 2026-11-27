@@ -66,6 +66,20 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         end
       RUBY
     end
+
+    it 'does not register an offense for grouped, union and intersection types' do
+      expect_no_offenses(<<~RUBY)
+        class Foo
+          # @param [Array(Symbol, Array([Integer, nil], [Integer, nil]))]
+          # @param [Array(Integer | nil, String)]
+          # @param [Array<String | nil>]
+          # @param [Foo & Bar]
+          # @param [[Foo | Bar] & Baz]
+          def foo
+          end
+        end
+      RUBY
+    end
   end
 
   context 'when EnforcedStyle is short' do

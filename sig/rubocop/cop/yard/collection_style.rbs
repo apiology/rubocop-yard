@@ -13,7 +13,7 @@ module RuboCop
         private
 
         def check: (Parser::Source::Comment comment) -> void
-        def ignore_whitespace: (String str) -> String
+        def normalize_type: (String str) -> String
         def bad_style: () -> (:short | :long)
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool
       end
