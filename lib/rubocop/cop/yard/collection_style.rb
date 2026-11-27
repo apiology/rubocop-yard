@@ -91,10 +91,12 @@ module RuboCop
             return if kind.nil?
 
             name = COLLECTION_NAMES[kind]
-            if name && name_index.nil?
-              out << name if style == :long
-            elsif name && out[name_index] == name && style == :short
-              out[name_index] = ''
+            if name
+              if name_index.nil?
+                out << name if style == :long
+              elsif out[name_index] == name && style == :short
+                out[name_index] = ''
+              end
             end
 
             if kind == :type_name
