@@ -3,10 +3,6 @@
 require 'spec_helper'
 
 RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
-  # `[A, B]`, `A | B` and `A & B` parse only on yard 0.9.46 and later.
-  GROUP_TYPES = defined?(YARD::Tags::TypesExplainer::GroupType)
-  NEEDS_YARD_0_9_46 = 'needs yard 0.9.46 or later'
-
   context 'when EnforcedStyle is long' do
     let(:cop_config) { { 'EnforcedStyle' => 'long' } }
 
@@ -86,7 +82,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       RUBY
     end
 
-    it 'does not register an offense for a named collection yard parses differently' do
+    it 'does not register an offense for named Hash types' do
       expect_no_offenses(<<~RUBY)
         class Foo
           # @param [Hash<Symbol, String>]
@@ -127,7 +123,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       RUBY
     end
 
-    it 'autocorrects only the collection name, keeping union spelling', skip: (NEEDS_YARD_0_9_46 unless GROUP_TYPES) do
+    it 'autocorrects only the collection name, keeping union spelling' do
       expect_offense(<<~RUBY)
         class Foo
           # @param [Array(<A> | B, C)]
@@ -296,7 +292,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       RUBY
     end
 
-    it 'autocorrects only the collection name, keeping union spelling', skip: (NEEDS_YARD_0_9_46 unless GROUP_TYPES) do
+    it 'autocorrects only the collection name, keeping union spelling' do
       expect_offense(<<~RUBY)
         class Foo
           # @param [(Symbol, [Array<Integer> | nil])]

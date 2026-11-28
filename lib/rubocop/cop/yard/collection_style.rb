@@ -51,11 +51,12 @@ module RuboCop
         # are Arrays, `{K => V}` is a Hash.
         COLLECTION_NAMES = { '<' => 'Array', '(' => 'Array', '{' => 'Hash' }.freeze
 
+        # A quoted literal or duck type, which is never edited.
+        LITERAL = /'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+)/
+
         # Splits a type into the parts whose spelling matters: a quoted literal
         # or duck type, which is left alone; a name with the collection opener
         # that follows it, if any; or an opener with no name.
-        LITERAL = /'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+)/
-
         SPELLING = /
           (?<skip>#{LITERAL})
           |(?<name>[\w:]+)(?<space>\s*)(?<opener>[<({])?
@@ -91,16 +92,14 @@ module RuboCop
         # tree gives how many Array and Hash collections there are, and the
         # source gives how many of them are written with their name.
         def wrong_style?(type, types_explainer)
+          return type != restyle(type) if style == :short
+
           named = 0
           type.scan(SPELLING) do
             match = Regexp.last_match or next
             named += 1 if match[:opener] && COLLECTION_NAMES.value?(match[:name])
           end
-          if style == :long
-            named < collection_count(types_explainer)
-          else
-            type != restyle(type)
-          end
+          named < collection_count(types_explainer)
         end
 
         # @return [Integer] the Array and Hash collections in the parse tree
