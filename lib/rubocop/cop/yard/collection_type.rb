@@ -27,6 +27,18 @@ module RuboCop
         include ConfigurableEnforcedStyle
         extend AutoCorrector
 
+        # The type as written, its index in the tag, and its collections in
+        # source order, for correcting just one of them.
+        class Target
+          attr_reader :type, :index, :nodes
+
+          def initialize(type, index, nodes)
+            @type = type
+            @index = index
+            @nodes = nodes
+          end
+        end
+
         def on_new_investigation
           processed_source.comments.each do |comment|
             next if inline_comment?(comment)
@@ -41,13 +53,11 @@ module RuboCop
 
         def check_mismatch_collection_type(comment, docstring)
           each_types_explainer(docstring) do |type, types_explainer, index|
-            target = [type, index, collection_nodes(types_explainer)]
+            target = Target.new(type, index, collection_nodes(types_explainer))
             check_mismatch_collection_type_one(comment, types_explainer, target)
           end
         end
 
-        # +target+ is the type as written, its index in the tag, and its
-        # collections in source order, for correcting just one of them.
         def check_mismatch_collection_type_one(comment, types_explainer, target)
           case types_explainer
           when ::YARD::Tags::TypesExplainer::HashCollectionType
@@ -104,7 +114,8 @@ module RuboCop
         # or with a nil +name+ rewrites its two slots as `{K => V}`, editing
         # only that collection in the type as written.
         def correct_collection(corrector, comment, target, node, name)
-          type, index, nodes = target
+          type = target.type
+          nodes = target.nodes
           tokens = type_tokens(type)
           openers = collection_openers(type, tokens)
           position = nodes.index { _1.equal?(node) }
@@ -118,7 +129,7 @@ module RuboCop
           else
             corrected = hash_braces_at(type, tokens, opener_index, name_start, prefix) or return
           end
-          replace_tag_type(corrector, comment, index, type, corrected)
+          replace_tag_type(corrector, comment, target.index, type, corrected)
         end
 
         def include_yard_tag?(comment)
