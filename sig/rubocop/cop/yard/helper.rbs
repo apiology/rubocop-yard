@@ -1,7 +1,7 @@
 module RuboCop
   module Cop
     module YARD
-      module Helper : RuboCop::Cop::Base
+      module Helper : RuboCop::Cop::Base, RuboCop::Cop::RangeHelp
         LITERAL: Regexp
         STRUCTURE: Regexp
 
@@ -15,6 +15,8 @@ module RuboCop
         def group_members: (::YARD::Tags::TypesExplainer::t types_explainer) -> Array[::YARD::Tags::TypesExplainer::t]
         def hash_braces_at: (String type, Array[[Symbol, Integer, Integer]] tokens, Integer index, Integer name_start, String prefix) -> String?
         def replace_tag_type: (Corrector corrector, Parser::Source::Comment comment, Integer index, String type, String corrected) -> void
+        def tag_type_bounds: (String source) -> [Integer, Integer]?
+        def tag_range_for_comment: (Parser::Source::Comment comment) -> Parser::Source::Range
         def inline_comment?: (Parser::Source::Comment comment) -> bool
         def build_docstring: (Array[Parser::Source::Comment] preceding_lines) -> ::YARD::DocstringParser?
       end

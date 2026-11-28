@@ -73,7 +73,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
       expect_offense(<<~RUBY)
         class Foo
           # @param [Array{Symbol => [A, B]}]
-                    ^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
+                    ^^^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
           # @param [Array{Symbol => A & B}]
                     ^^^^^^^^^^^^^^^^^^^^^^^ `{KeyType => ValueType}` is the Hash collection type syntax.
           def foo
@@ -95,13 +95,15 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
       expect_offense(<<~RUBY)
         class Foo
           # @param [[Hash(Symbol), nil]]
-                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+                    ^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Array(Hash(Symbol) | nil)]
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Hash(Symbol) & Foo]
                     ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Array<Hash(Symbol)>]
                     ^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Array([Hash(Symbol), nil])]
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Hash(Symbol), nil]
                     ^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           def foo
@@ -115,6 +117,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
           # @param [Array(Array(Symbol) | nil)]
           # @param [Array(Symbol) & Foo]
           # @param [Array<Array(Symbol)>]
+          # @param [Array([Array(Symbol), nil])]
           # @param [Array(Symbol), nil]
           def foo
           end
@@ -155,7 +158,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
       expect_offense(<<~RUBY)
         class Foo
           # @param [[Hash(Symbol), nil]]
-                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+                    ^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Hash(Symbol) & Foo]
                     ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
           # @param [Hash(Symbol), nil]

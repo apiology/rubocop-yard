@@ -16,6 +16,19 @@ RSpec.describe RuboCop::Cop::YARD::TagTypePosition, :config do
     RUBY
   end
 
+  it 'quotes only the type list, through its matching bracket' do
+    expect_offense(<<~RUBY)
+      class Foo
+        # @param aaa bbb [[A, B]] the [x]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This docs found `[[A, B]]`, but parser of YARD can't found types. Please check syntax of YARD.
+        # @param aaa bbb [Integer] and [x]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This docs found `[Integer]`, but parser of YARD can't found types. Please check syntax of YARD.
+        def foo
+        end
+      end
+    RUBY
+  end
+
   it 'does not register an offense for correct type position' do
     expect_no_offenses(<<~RUBY)
       class Foo

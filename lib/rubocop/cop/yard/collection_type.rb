@@ -135,15 +135,6 @@ module RuboCop
         def include_yard_tag?(comment)
           comment.source.match?(/@(?:param|return|option|raise|yieldparam|yieldreturn)\s+.*\[.*\]/)
         end
-
-        def tag_range_for_comment(comment)
-          # include_yard_tag? guarantees that the comment has `[...]`
-          start_column = comment.source.index(/\[/) or raise "`[` is not found in #{comment.source}"
-          end_column = comment.source.index(/\]/) or raise "`]` is not found in #{comment.source}"
-          offense_start = comment.location.column + start_column + 1
-          offense_end = comment.location.column + end_column
-          source_range(processed_source.buffer, comment.location.line, offense_start..offense_end)
-        end
       end
     end
   end

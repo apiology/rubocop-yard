@@ -22,7 +22,6 @@ module RuboCop
         def check_mismatch_collection_type_one: (Parser::Source::Comment comment, ::YARD::Tags::TypesExplainer::t types_explainer, Target target) -> void
         def correct_collection: (Corrector corrector, Parser::Source::Comment comment, Target target, ::YARD::Tags::TypesExplainer::t node, String? name) -> void
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool
-        def tag_range_for_comment: (Parser::Source::Comment comment) -> Parser::Source::Range
       end
     end
   end

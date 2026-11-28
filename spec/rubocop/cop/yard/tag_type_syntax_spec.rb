@@ -18,6 +18,19 @@ RSpec.describe RuboCop::Cop::YARD::TagTypeSyntax, :config do
     RUBY
   end
 
+  it 'marks the whole type list when it contains a group' do
+    expect_offense(<<~RUBY)
+      class Foo
+        # @param [[A | B^]] foo
+                  ^^^^^^^^^ (SyntaxError) invalid character at ^
+        # @param [Array<[A, B^]>] bar
+                  ^^^^^^^^^^^^^^^ (SyntaxError) invalid character at ^
+        def foo
+        end
+      end
+    RUBY
+  end
+
   it 'does not register an offense for valid syntax' do
     expect_no_offenses(<<~RUBY)
       class Foo

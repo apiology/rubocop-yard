@@ -154,6 +154,38 @@ module RuboCop
           corrector.replace(comment, "#{source[0...from]}#{segment[/\A\s*/]}#{corrected}#{segment[/\s*\z/]}#{source[to..]}")
         end
 
+        # @return [Array(Integer, Integer), nil] where the tag's type list
+        #   opens (`[`) and closes (its matching `]`) in +source+. Literals and
+        #   duck types are skipped, and only square brackets count, so this
+        #   holds even when the types inside don't parse.
+        def tag_type_bounds(source)
+          depth = 0
+          open = nil
+          type_tokens(source).each do |kind, start, _|
+            char = source[start]
+            next unless (kind == :open && char == '[') || (kind == :close && char == ']')
+            next if open.nil? && char == ']'
+
+            open ||= start
+            depth += char == '[' ? 1 : -1
+            return [open, start] if depth.zero?
+          end
+          nil
+        end
+
+        # The tag's types, from after its `[` through its matching `]`.
+        def tag_range_for_comment(comment)
+          # include_yard_tag? guarantees that the comment has `[...]`
+          bounds = tag_type_bounds(comment.source)
+          start_column = bounds ? bounds[0] : comment.source.index(/\[/)
+          end_column = bounds ? bounds[1] : comment.source.index(/\]/)
+          raise "`[...]` is not found in #{comment.source}" unless start_column && end_column
+
+          offense_start = comment.location.column + start_column + 1
+          offense_end = comment.location.column + end_column
+          source_range(processed_source.buffer, comment.location.line, offense_start..offense_end)
+        end
+
         def inline_comment?(comment)
           !comment_line?(comment.source_range.source_line)
         end
