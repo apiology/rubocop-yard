@@ -4,11 +4,9 @@ module RuboCop
   module Cop
     module YARD
       module Helper
-        # A quoted literal or duck type, which is never edited.
-        LITERAL = /'[^']*'|"[^"]*"|\##{::YARD::CodeObjects::METHODNAMEMATCH}/
+        LITERAL_OR_DUCK_TYPE = /'[^']*'|"[^"]*"|\##{::YARD::CodeObjects::METHODNAMEMATCH}/
 
-        # Names, brackets and commas of a type, outside literals and `=>`.
-        STRUCTURE = /(?<skip>#{LITERAL}|=>)|(?<name>[\w:]+)|(?<open>[<({\[])|(?<close>[>)}\]])|(?<comma>,)/
+        TYPE_TOKEN = /(?<skip>#{LITERAL_OR_DUCK_TYPE}|=>)|(?<name>[\w:]+)|(?<open>[<({\[])|(?<close>[>)}\]])|(?<comma>,)/
 
         def extract_tag_types(tag)
           case tag
@@ -44,11 +42,9 @@ module RuboCop
           end
         end
 
-        # @return [Array<Array(Symbol, Integer, Integer)>] the kind, start and
-        #   end of each name, bracket and comma in +source+
         def type_tokens(source)
           tokens = []
-          source.scan(STRUCTURE) do
+          source.scan(TYPE_TOKEN) do
             match = Regexp.last_match or next
             kind = %i[name open close comma].find { match[_1] } or next
             tokens << [kind, match.begin(0), match.end(0)]
@@ -56,26 +52,19 @@ module RuboCop
           tokens
         end
 
-        # @return [Array(Integer, Array<Integer>), nil] for the bracket that
-        #   tokens[index] opens, the index of its closing token and of each
-        #   comma directly inside it
-        def bracket_span(tokens, index)
+        def closing_and_commas(tokens, open_index)
           depth = 0
-          commas = []
-          (index...tokens.size).each do |i|
+          commas_inside = []
+          (open_index...tokens.size).each do |i|
             kind, = tokens.fetch(i)
             depth += 1 if kind == :open
             depth -= 1 if kind == :close
-            commas << i if kind == :comma && depth == 1
-            return [i, commas] if depth.zero?
+            commas_inside << i if kind == :comma && depth == 1
+            return [i, commas_inside] if depth.zero?
           end
           nil
         end
 
-        # @return [Array<Array(Integer, Integer)>] for each collection opener
-        #   (`<`, `(` or `{`) in +type+, where its name starts (the opener
-        #   itself if it has none) and its index in +tokens+, in the order
-        #   {#collection_nodes} lists them
         def collection_openers(type, tokens)
           openers = []
           tokens.each_with_index do |(kind, start, _), i|
@@ -83,14 +72,12 @@ module RuboCop
 
             previous = i.positive? ? tokens[i - 1] : nil
             named = previous && previous[0] == :name && type[previous[2]...start].to_s.strip.empty?
-            openers << [named && previous ? previous[1] : start, i]
+            name_start = named && previous ? previous[1] : start
+            openers << [name_start, i]
           end
           openers
         end
 
-        # @return [Array<::YARD::Tags::TypesExplainer::Type>] every collection
-        #   in the parse tree, each before the ones inside it, which is the
-        #   order their openers appear in the type
         def collection_nodes(types_explainer)
           case types_explainer
           when ::YARD::Tags::TypesExplainer::HashCollectionType
@@ -116,16 +103,14 @@ module RuboCop
           end
         end
 
-        # Rewrites the collection that tokens[index] opens, whose name starts
-        # at name_start, as `<prefix>{K => V}`, keeping K and V as written.
-        # @return [String, nil] nil unless it has exactly two slots
-        def hash_braces_at(type, tokens, index, name_start, prefix)
-          open_token = tokens[index] or return
-          span = bracket_span(tokens, index) or return
+        def key_value_braces(type, tokens, open_index, name_start, prefix)
+          open_token = tokens[open_index] or return
+          span = closing_and_commas(tokens, open_index) or return
           open_end = open_token[2]
           close, commas = span
           comma = commas.first
-          return unless commas.size == 1 && comma
+          two_slots = commas.size == 1 && comma
+          return unless two_slots
 
           _, comma_start, comma_end = tokens.fetch(comma)
           _, close_start, close_end = tokens.fetch(close)
@@ -134,14 +119,11 @@ module RuboCop
           "#{type[0...name_start]}#{prefix}{#{key} => #{value}}#{type[close_end..]}"
         end
 
-        # Replaces the index-th type in the comment's `[...]` with +corrected+,
-        # keeping the tag's other types and the rest of the comment. Does
-        # nothing if that type can't be found where yard's list puts it.
         def replace_tag_type(corrector, comment, index, type, corrected)
           source = comment.source
           tokens = type_tokens(source)
           open = tokens.index { |kind, start, _| kind == :open && source[start] == '[' } or return
-          span = bracket_span(tokens, open) or return
+          span = closing_and_commas(tokens, open) or return
           close, commas = span
           bounds = [tokens.fetch(open)[2]]
           commas.each { |i| bounds.push(tokens.fetch(i)[1], tokens.fetch(i)[2]) }
@@ -154,10 +136,7 @@ module RuboCop
           corrector.replace(comment, "#{source[0...from]}#{segment[/\A\s*/]}#{corrected}#{segment[/\s*\z/]}#{source[to..]}")
         end
 
-        # @return [Array(Integer, Integer), nil] where the tag's type list
-        #   opens (`[`) and closes (its matching `]`) in +source+. Literals and
-        #   duck types are skipped, and only square brackets count, so this
-        #   holds even when the types inside don't parse.
+        # Counts only square brackets, so it works even when the types inside don't parse.
         def tag_type_bounds(source)
           depth = 0
           open = nil
@@ -173,7 +152,6 @@ module RuboCop
           nil
         end
 
-        # The tag's types, from after its `[` through its matching `]`.
         def tag_range_for_comment(comment)
           # include_yard_tag? guarantees that the comment has `[...]`
           bounds = tag_type_bounds(comment.source)

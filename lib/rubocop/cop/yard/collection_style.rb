@@ -47,15 +47,10 @@ module RuboCop
         include ConfigurableEnforcedStyle
         extend AutoCorrector
 
-        # Names yard gives a collection written without one: `<T>` and `(T)`
-        # are Arrays, `{K => V}` is a Hash.
-        COLLECTION_NAMES = { '<' => 'Array', '(' => 'Array', '{' => 'Hash' }.freeze
+        IMPLIED_NAME = { '<' => 'Array', '(' => 'Array', '{' => 'Hash' }.freeze
 
-        # Splits a type into the parts whose spelling matters: a quoted literal
-        # or duck type, which is left alone; a name with the collection opener
-        # that follows it, if any; or an opener with no name.
         SPELLING = /
-          (?<skip>#{LITERAL})
+          (?<skip>#{LITERAL_OR_DUCK_TYPE})
           |(?<name>[\w:]+)(?<space>\s*)(?<opener>[<({])?
           |(?<bare>[<({])
         /x
@@ -82,28 +77,26 @@ module RuboCop
           end
         end
 
-        # yard names `<String>` and `Array<String>` both Array, so the parse
-        # tree gives how many Array and Hash collections there are, and the
-        # source gives how many of them are written with their name.
+        # yard names `<T>` and `Array<T>` alike, so only the source shows which is written.
         def wrong_style?(type, types_explainer)
           return type != restyle(type) if style == :short
 
-          named = 0
+          named_collection_count(type) < collection_count(types_explainer)
+        end
+
+        def named_collection_count(type)
+          count = 0
           type.scan(SPELLING) do
             match = Regexp.last_match or next
-            named += 1 if match[:opener] && COLLECTION_NAMES.value?(match[:name])
+            count += 1 if match[:opener] && IMPLIED_NAME.value?(match[:name])
           end
-          named < collection_count(types_explainer)
+          count
         end
 
-        # @return [Integer] the Array and Hash collections in the parse tree
         def collection_count(types_explainer)
-          collection_nodes(types_explainer).count { COLLECTION_NAMES.value?(_1.name) }
+          collection_nodes(types_explainer).count { IMPLIED_NAME.value?(_1.name) }
         end
 
-        # Long style names each unnamed collection; short style drops the name
-        # where the bare form means the same (`Array<`, `Array(`, `Hash{`).
-        # Everything else stays as written.
         def restyle(type)
           type = hash_braces(type) if style == :short
           type.gsub(SPELLING) do |text|
@@ -112,8 +105,8 @@ module RuboCop
             name = match[:name]
             opener = match[:opener]
             if bare
-              style == :long ? "#{COLLECTION_NAMES.fetch(bare)}#{bare}" : text
-            elsif name && opener && style == :short && COLLECTION_NAMES[opener] == name
+              style == :long ? "#{IMPLIED_NAME.fetch(bare)}#{bare}" : text
+            elsif name && opener && style == :short && IMPLIED_NAME[opener] == name
               "#{match[:space]}#{opener}"
             else
               text
@@ -121,31 +114,28 @@ module RuboCop
           end
         end
 
-        # Rewrites each `Hash<K, V>` as `Hash{K => V}`, keeping K and V as
-        # written: yard 0.9.46 reads both as a Hash, and only the braces have a
-        # short form. Innermost first, so `Hash<K, Hash<K, V>>` works; a
-        # `Hash<...>` without exactly two slots is a plain collection and stays.
+        # yard 0.9.46 reads `Hash<K, V>` as a Hash, whose only short form is `{K => V}`.
         def hash_braces(type)
           loop do
-            rewritten = rewrite_last_hash_angle(type)
+            rewritten = rewrite_innermost_hash_angle(type)
             return type if rewritten.nil?
 
             type = rewritten
           end
         end
 
-        # @return [String, nil] nil if no `Hash<K, V>` is left
-        def rewrite_last_hash_angle(type)
+        def rewrite_innermost_hash_angle(type)
           tokens = type_tokens(type)
           tokens.each_index.reverse_each do |index|
             kind, start, name_end = tokens.fetch(index)
             next unless kind == :name && type[start...name_end] == 'Hash'
 
             open_kind, open_start, = tokens[index + 1]
-            next unless open_kind == :open && open_start && type[open_start] == '<'
-            next unless type[name_end...open_start].to_s.strip.empty?
+            angle_follows = open_kind == :open && open_start && type[open_start] == '<' &&
+                            type[name_end...open_start].to_s.strip.empty?
+            next unless angle_follows
 
-            rewritten = hash_braces_at(type, tokens, index + 1, start, 'Hash')
+            rewritten = key_value_braces(type, tokens, index + 1, start, 'Hash')
             return rewritten if rewritten && parses?(rewritten)
           end
           nil

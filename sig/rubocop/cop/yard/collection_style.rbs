@@ -7,7 +7,7 @@ module RuboCop
         include ConfigurableEnforcedStyle
         extend AutoCorrector
 
-        COLLECTION_NAMES: Hash[String, String]
+        IMPLIED_NAME: Hash[String, String]
         SPELLING: Regexp
 
         def on_new_investigation: () -> void
@@ -16,10 +16,11 @@ module RuboCop
 
         def check: (Parser::Source::Comment comment) -> void
         def wrong_style?: (String type, ::YARD::Tags::TypesExplainer::t types_explainer) -> bool
+        def named_collection_count: (String type) -> Integer
         def collection_count: (::YARD::Tags::TypesExplainer::t types_explainer) -> Integer
         def restyle: (String type) -> String
         def hash_braces: (String type) -> String
-        def rewrite_last_hash_angle: (String type) -> String?
+        def rewrite_innermost_hash_angle: (String type) -> String?
         def parses?: (String type) -> bool
         def bad_style: () -> (:short | :long)
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool

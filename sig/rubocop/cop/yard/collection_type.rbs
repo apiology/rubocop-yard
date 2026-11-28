@@ -8,10 +8,10 @@ module RuboCop
         extend AutoCorrector
 
         class Target
-          attr_reader type: String
-          attr_reader index: Integer
-          attr_reader nodes: Array[::YARD::Tags::TypesExplainer::t]
-          def initialize: (String type, Integer index, Array[::YARD::Tags::TypesExplainer::t] nodes) -> void
+          attr_reader written: String
+          attr_reader index_in_tag: Integer
+          attr_reader collections: Array[::YARD::Tags::TypesExplainer::t]
+          def initialize: (String written, Integer index_in_tag, Array[::YARD::Tags::TypesExplainer::t] collections) -> void
         end
 
         def on_new_investigation: () -> void
@@ -20,7 +20,9 @@ module RuboCop
 
         def check_mismatch_collection_type: (Parser::Source::Comment comment, ::YARD::DocstringParser docstring) -> void
         def check_mismatch_collection_type_one: (Parser::Source::Comment comment, ::YARD::Tags::TypesExplainer::t types_explainer, Target target) -> void
-        def correct_collection: (Corrector corrector, Parser::Source::Comment comment, Target target, ::YARD::Tags::TypesExplainer::t node, String? name) -> void
+        def rename_collection: (Corrector corrector, Parser::Source::Comment comment, Target target, ::YARD::Tags::TypesExplainer::t node, String name) -> void
+        def rewrite_as_hash: (Corrector corrector, Parser::Source::Comment comment, Target target, ::YARD::Tags::TypesExplainer::t node) -> void
+        def opener_for: (Target target, Array[[Symbol, Integer, Integer]] tokens, ::YARD::Tags::TypesExplainer::t node) -> [Integer, Integer]?
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool
       end
     end

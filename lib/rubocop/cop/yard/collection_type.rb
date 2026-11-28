@@ -27,15 +27,13 @@ module RuboCop
         include ConfigurableEnforcedStyle
         extend AutoCorrector
 
-        # The type as written, its index in the tag, and its collections in
-        # source order, for correcting just one of them.
         class Target
-          attr_reader :type, :index, :nodes
+          attr_reader :written, :index_in_tag, :collections
 
-          def initialize(type, index, nodes)
-            @type = type
-            @index = index
-            @nodes = nodes
+          def initialize(written, index_in_tag, collections)
+            @written = written
+            @index_in_tag = index_in_tag
+            @collections = collections
           end
         end
 
@@ -68,7 +66,7 @@ module RuboCop
             when 'Array'
               message = "`{KeyType => ValueType}` is the Hash collection type syntax."
               add_offense(tag_range_for_comment(comment), message: message) do |corrector|
-                correct_collection(corrector, comment, target, types_explainer, 'Hash')
+                rename_collection(corrector, comment, target, types_explainer, 'Hash')
               end
             end
           when ::YARD::Tags::TypesExplainer::FixedCollectionType
@@ -77,12 +75,12 @@ module RuboCop
               if types_explainer.types.length == 2
                 message = "`Hash(Key, Value)` is miswritten of `Hash<Key, Value>` in perhaps"
                 add_offense(tag_range_for_comment(comment), message: message) do |corrector|
-                  correct_collection(corrector, comment, target, types_explainer, nil)
+                  rewrite_as_hash(corrector, comment, target, types_explainer)
                 end
               else
                 message = "`(Type)` is the fixed collection type syntax."
                 add_offense(tag_range_for_comment(comment), message: message) do |corrector|
-                  correct_collection(corrector, comment, target, types_explainer, 'Array')
+                  rename_collection(corrector, comment, target, types_explainer, 'Array')
                 end
               end
             when 'Array'
@@ -94,12 +92,12 @@ module RuboCop
               if types_explainer.types.length == 2
                 message = "`Hash<Key, Value>` is ambiguous syntax"
                 add_offense(tag_range_for_comment(comment), message: message) do |corrector|
-                  correct_collection(corrector, comment, target, types_explainer, nil)
+                  rewrite_as_hash(corrector, comment, target, types_explainer)
                 end
               else
                 message = "`<Type>` is the collection type syntax."
                 add_offense(tag_range_for_comment(comment), message: message) do |corrector|
-                  correct_collection(corrector, comment, target, types_explainer, 'Array')
+                  rename_collection(corrector, comment, target, types_explainer, 'Array')
                 end
               end
             when 'Array'
@@ -110,26 +108,34 @@ module RuboCop
           end
         end
 
-        # Renames the collection to +name+ (or drops the name in short style),
-        # or with a nil +name+ rewrites its two slots as `{K => V}`, editing
-        # only that collection in the type as written.
-        def correct_collection(corrector, comment, target, node, name)
-          type = target.type
-          nodes = target.nodes
+        def rename_collection(corrector, comment, target, node, name)
+          type = target.written
           tokens = type_tokens(type)
-          openers = collection_openers(type, tokens)
-          position = nodes.index { _1.equal?(node) }
-          return unless position && openers.size == nodes.size
+          opener = opener_for(target, tokens, node) or return
+          name_start, opener_index = opener
+          written_name = style == :long ? name : ''
+          open_start = tokens.fetch(opener_index)[1]
+          corrected = "#{type[0...name_start]}#{written_name}#{type[open_start..]}"
+          replace_tag_type(corrector, comment, target.index_in_tag, type, corrected)
+        end
 
-          name_start, opener_index = openers.fetch(position)
-          prefix = style == :long ? (name || 'Hash') : ''
-          if name
-            open_start = tokens.fetch(opener_index)[1]
-            corrected = "#{type[0...name_start]}#{prefix}#{type[open_start..]}"
-          else
-            corrected = hash_braces_at(type, tokens, opener_index, name_start, prefix) or return
-          end
-          replace_tag_type(corrector, comment, target.index, type, corrected)
+        def rewrite_as_hash(corrector, comment, target, node)
+          type = target.written
+          tokens = type_tokens(type)
+          opener = opener_for(target, tokens, node) or return
+          name_start, opener_index = opener
+          written_name = style == :long ? 'Hash' : ''
+          corrected = key_value_braces(type, tokens, opener_index, name_start, written_name) or return
+          replace_tag_type(corrector, comment, target.index_in_tag, type, corrected)
+        end
+
+        # yard lists collections in the order their openers appear in the type.
+        def opener_for(target, tokens, node)
+          openers = collection_openers(target.written, tokens)
+          position = target.collections.index { _1.equal?(node) }
+          return unless position && openers.size == target.collections.size
+
+          openers.fetch(position)
         end
 
         def include_yard_tag?(comment)
