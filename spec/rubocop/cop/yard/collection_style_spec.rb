@@ -213,9 +213,29 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
     it 'keeps the name where the short form means something else' do
       expect_no_offenses(<<~RUBY)
         class Foo
-          # @param [Hash<Symbol, String>]
           # @param [Hash(Symbol)]
           # @param [Array{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'rewrites Hash<K, V> to {K => V}' do
+      pending 'short style does not rewrite Hash<K, V> yet'
+
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Hash<Symbol, String>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash<Symbol, String>` is using long style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [{Symbol => String}]
           def foo
           end
         end
