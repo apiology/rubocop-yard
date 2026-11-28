@@ -8,9 +8,7 @@ module RuboCop
         extend AutoCorrector
 
         COLLECTION_NAMES: Hash[String, String]
-        LITERAL: Regexp
         SPELLING: Regexp
-        STRUCTURE: Regexp
 
         def on_new_investigation: () -> void
 
@@ -19,11 +17,9 @@ module RuboCop
         def check: (Parser::Source::Comment comment) -> void
         def wrong_style?: (String type, ::YARD::Tags::TypesExplainer::t types_explainer) -> bool
         def collection_count: (::YARD::Tags::TypesExplainer::t types_explainer) -> Integer
-        def group_members: (::YARD::Tags::TypesExplainer::t types_explainer) -> Array[::YARD::Tags::TypesExplainer::t]
         def restyle: (String type) -> String
         def hash_braces: (String type) -> String
         def rewrite_last_hash_angle: (String type) -> String?
-        def hash_angle_slots: (String type, Array[[Symbol, Integer, Integer]] tokens, Integer index, Integer name_end) -> [Integer, [Integer, Integer], Integer]?
         def parses?: (String type) -> bool
         def bad_style: () -> (:short | :long)
         def include_yard_tag?: (Parser::Source::Comment comment) -> bool

@@ -62,7 +62,7 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
 
       expect_correction(<<~RUBY)
         class Foo
-          # @param [Hash{Symbol => Hash{Symbol => Range<Integer>}}]
+          # @param [Hash{Symbol => {Symbol => Range<Integer>}}]
           def foo
           end
         end
@@ -85,6 +85,37 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
         class Foo
           # @param [Hash{Symbol => [A, B]}]
           # @param [Hash{Symbol => A & B}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'corrects only the offending collection, inside groups and alongside other types' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [[Hash(Symbol), nil]]
+                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Array(Hash(Symbol) | nil)]
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Hash(Symbol) & Foo]
+                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Array<Hash(Symbol)>]
+                    ^^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Hash(Symbol), nil]
+                    ^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [[Array(Symbol), nil]]
+          # @param [Array(Array(Symbol) | nil)]
+          # @param [Array(Symbol) & Foo]
+          # @param [Array<Array(Symbol)>]
+          # @param [Array(Symbol), nil]
           def foo
           end
         end
@@ -114,6 +145,31 @@ RSpec.describe RuboCop::Cop::YARD::CollectionType, :config do
           # @param [(Symbol)]
           # @param [{Symbol => String}]
           # @param [{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'corrects only the offending collection, inside groups and alongside other types' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [[Hash(Symbol), nil]]
+                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Hash(Symbol) & Foo]
+                    ^^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          # @param [Hash(Symbol), nil]
+                    ^^^^^^^^^^^^^^^^^^ `(Type)` is the fixed collection type syntax.
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [[(Symbol), nil]]
+          # @param [(Symbol) & Foo]
+          # @param [(Symbol), nil]
           def foo
           end
         end

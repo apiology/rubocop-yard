@@ -2,9 +2,19 @@ module RuboCop
   module Cop
     module YARD
       module Helper : RuboCop::Cop::Base
+        LITERAL: Regexp
+        STRUCTURE: Regexp
+
         def extract_tag_types: (::YARD::Tags::t | ::YARD::Tags::RefTagList tag) -> Array[String]?
         def parse_type: (String type) -> Array[::YARD::Tags::TypesExplainer::t]
-        def each_types_explainer: (::YARD::DocstringParser docstring) { (String type, ::YARD::Tags::TypesExplainer::t types_explainer) -> void } -> void
+        def each_types_explainer: (::YARD::DocstringParser docstring) { (String type, ::YARD::Tags::TypesExplainer::t types_explainer, Integer index) -> void } -> void
+        def type_tokens: (String source) -> Array[[Symbol, Integer, Integer]]
+        def bracket_span: (Array[[Symbol, Integer, Integer]] tokens, Integer index) -> [Integer, Array[Integer]]?
+        def collection_openers: (String type, Array[[Symbol, Integer, Integer]] tokens) -> Array[[Integer, Integer]]
+        def collection_nodes: (::YARD::Tags::TypesExplainer::t types_explainer) -> Array[::YARD::Tags::TypesExplainer::t]
+        def group_members: (::YARD::Tags::TypesExplainer::t types_explainer) -> Array[::YARD::Tags::TypesExplainer::t]
+        def hash_braces_at: (String type, Array[[Symbol, Integer, Integer]] tokens, Integer index, Integer name_start, String prefix) -> String?
+        def replace_tag_type: (Corrector corrector, Parser::Source::Comment comment, Integer index, String type, String corrected) -> void
         def inline_comment?: (Parser::Source::Comment comment) -> bool
         def build_docstring: (Array[Parser::Source::Comment] preceding_lines) -> ::YARD::DocstringParser?
       end

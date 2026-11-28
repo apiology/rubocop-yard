@@ -51,9 +51,6 @@ module RuboCop
         # are Arrays, `{K => V}` is a Hash.
         COLLECTION_NAMES = { '<' => 'Array', '(' => 'Array', '{' => 'Hash' }.freeze
 
-        # A quoted literal or duck type, which is never edited.
-        LITERAL = /'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+)/
-
         # Splits a type into the parts whose spelling matters: a quoted literal
         # or duck type, which is left alone; a name with the collection opener
         # that follows it, if any; or an opener with no name.
@@ -62,9 +59,6 @@ module RuboCop
           |(?<name>[\w:]+)(?<space>\s*)(?<opener>[<({])?
           |(?<bare>[<({])
         /x
-
-        # Brackets, commas and names, for finding where a `Hash<` ends.
-        STRUCTURE = /(?<skip>#{LITERAL}|=>)|(?<name>[\w:]+)|(?<open>[<({\[])|(?<close>[>)}\]])|(?<comma>,)/
 
         def on_new_investigation
           processed_source.comments.each do |comment|
@@ -79,11 +73,11 @@ module RuboCop
 
         def check(comment)
           docstring = ::YARD::DocstringParser.new.parse(comment.text.gsub(/\A#\s*/, ''))
-          each_types_explainer(docstring) do |type, types_explainer|
+          each_types_explainer(docstring) do |type, types_explainer, index|
             next unless wrong_style?(type, types_explainer)
 
             add_offense(comment, message: "`#{type}` is using #{bad_style} style syntax") do |corrector|
-              corrector.replace(comment, comment.source.sub(/\[(.*)\]/) { "[#{restyle(type)}]" })
+              replace_tag_type(corrector, comment, index, type, restyle(type))
             end
           end
         end
@@ -104,30 +98,7 @@ module RuboCop
 
         # @return [Integer] the Array and Hash collections in the parse tree
         def collection_count(types_explainer)
-          case types_explainer
-          when ::YARD::Tags::TypesExplainer::HashCollectionType
-            children = types_explainer.key_value_pairs.flatten
-          when ::YARD::Tags::TypesExplainer::CollectionType
-            children = types_explainer.types
-          else
-            children = group_members(types_explainer)
-            return children.inject(0) { |total, child| total + collection_count(child) }
-          end
-          own = COLLECTION_NAMES.value?(types_explainer.name) ? 1 : 0
-          children.inject(own) { |total, child| total + collection_count(child) }
-        end
-
-        # GroupType and IntersectionType need yard 0.9.46 or later.
-        def group_members(types_explainer)
-          if defined?(::YARD::Tags::TypesExplainer::GroupType) &&
-             types_explainer.is_a?(::YARD::Tags::TypesExplainer::GroupType)
-            types_explainer.types
-          elsif defined?(::YARD::Tags::TypesExplainer::IntersectionType) &&
-                types_explainer.is_a?(::YARD::Tags::TypesExplainer::IntersectionType)
-            types_explainer.types
-          else
-            []
-          end
+          collection_nodes(types_explainer).count { COLLECTION_NAMES.value?(_1.name) }
         end
 
         # Long style names each unnamed collection; short style drops the name
@@ -165,43 +136,17 @@ module RuboCop
 
         # @return [String, nil] nil if no `Hash<K, V>` is left
         def rewrite_last_hash_angle(type)
-          tokens = []
-          type.scan(STRUCTURE) do
-            match = Regexp.last_match or next
-            kind = %i[name open close comma].find { match[_1] } or next
-            tokens << [kind, match.begin(0), match.end(0)]
-          end
-
+          tokens = type_tokens(type)
           tokens.each_index.reverse_each do |index|
             kind, start, name_end = tokens.fetch(index)
             next unless kind == :name && type[start...name_end] == 'Hash'
 
-            slots = hash_angle_slots(type, tokens, index + 1, name_end) or next
-            open_end, comma, close = slots
-            key = type[open_end...comma.first].to_s.strip
-            value = type[comma.last...close].to_s.strip
-            rewritten = "#{type[0...start]}Hash{#{key} => #{value}}#{type[(close + 1)..]}"
-            return rewritten if parses?(rewritten)
-          end
-          nil
-        end
+            open_kind, open_start, = tokens[index + 1]
+            next unless open_kind == :open && open_start && type[open_start] == '<'
+            next unless type[name_end...open_start].to_s.strip.empty?
 
-        # @return [Array(Integer, Array(Integer, Integer), Integer), nil] where
-        #   the slots start, the one comma between them, and the closing `>`
-        def hash_angle_slots(type, tokens, index, name_end)
-          kind, start, open_end = tokens[index]
-          return unless kind == :open && type[start] == '<' && type[name_end...start].to_s.strip.empty?
-
-          depth = 0
-          commas = []
-          tokens.drop(index).each do |token_kind, token_start, token_end|
-            depth += 1 if token_kind == :open
-            depth -= 1 if token_kind == :close
-            commas << [token_start, token_end] if token_kind == :comma && depth == 1
-            next unless depth.zero?
-
-            comma = commas.first
-            return commas.size == 1 && comma ? [open_end, comma, token_start] : nil
+            rewritten = hash_braces_at(type, tokens, index + 1, start, 'Hash')
+            return rewritten if rewritten && parses?(rewritten)
           end
           nil
         end

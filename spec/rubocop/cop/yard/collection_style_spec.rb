@@ -144,6 +144,25 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         end
       RUBY
     end
+
+    it 'corrects only the offending type when a tag lists several' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [<Symbol>, nil]
+          ^^^^^^^^^^^^^^^^^^^^^^^^ `<Symbol>` is using short style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [Array<Symbol>, nil]
+          def foo
+          end
+        end
+      RUBY
+    end
   end
 
   context 'when EnforcedStyle is short' do
@@ -305,6 +324,25 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       expect_correction(<<~RUBY)
         class Foo
           # @param [(Symbol, [<Integer> | nil])]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'corrects only the offending type when a tag lists several' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Array<Symbol>, nil]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array<Symbol>` is using long style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [<Symbol>, nil]
           def foo
           end
         end
