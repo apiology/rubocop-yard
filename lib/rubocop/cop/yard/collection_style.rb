@@ -54,11 +54,16 @@ module RuboCop
         # Splits a type into the parts whose spelling matters: a quoted literal
         # or duck type, which is left alone; a name with the collection opener
         # that follows it, if any; or an opener with no name.
+        LITERAL = /'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+)/
+
         SPELLING = /
-          (?<skip>'[^']*'|"[^"]*"|\#(?:\w+[?!=]?|\[\]=?|[<>=!~+\-*\/%&|^]+))
+          (?<skip>#{LITERAL})
           |(?<name>[\w:]+)(?<space>\s*)(?<opener>[<({])?
           |(?<bare>[<({])
         /x
+
+        # Brackets, commas and names, for finding where a `Hash<` ends.
+        STRUCTURE = /(?<skip>#{LITERAL}|=>)|(?<name>[\w:]+)|(?<open>[<({\[])|(?<close>[>)}\]])|(?<comma>,)/
 
         def on_new_investigation
           processed_source.comments.each do |comment|
@@ -130,6 +135,7 @@ module RuboCop
         # where the bare form means the same (`Array<`, `Array(`, `Hash{`).
         # Everything else stays as written.
         def restyle(type)
+          type = hash_braces(type) if style == :short
           type.gsub(SPELLING) do |text|
             match = Regexp.last_match or next text
             bare = match[:bare]
@@ -143,6 +149,69 @@ module RuboCop
               text
             end
           end
+        end
+
+        # Rewrites each `Hash<K, V>` as `Hash{K => V}`, keeping K and V as
+        # written: yard 0.9.46 reads both as a Hash, and only the braces have a
+        # short form. Innermost first, so `Hash<K, Hash<K, V>>` works; a
+        # `Hash<...>` without exactly two slots is a plain collection and stays.
+        def hash_braces(type)
+          loop do
+            rewritten = rewrite_last_hash_angle(type)
+            return type if rewritten.nil?
+
+            type = rewritten
+          end
+        end
+
+        # @return [String, nil] nil if no `Hash<K, V>` is left
+        def rewrite_last_hash_angle(type)
+          tokens = []
+          type.scan(STRUCTURE) do
+            match = Regexp.last_match or next
+            kind = %i[name open close comma].find { match[_1] } or next
+            tokens << [kind, match.begin(0), match.end(0)]
+          end
+
+          tokens.each_index.reverse_each do |index|
+            kind, start, name_end = tokens.fetch(index)
+            next unless kind == :name && type[start...name_end] == 'Hash'
+
+            slots = hash_angle_slots(type, tokens, index + 1, name_end) or next
+            open_end, comma, close = slots
+            key = type[open_end...comma.first].to_s.strip
+            value = type[comma.last...close].to_s.strip
+            rewritten = "#{type[0...start]}Hash{#{key} => #{value}}#{type[(close + 1)..]}"
+            return rewritten if parses?(rewritten)
+          end
+          nil
+        end
+
+        # @return [Array(Integer, Array(Integer, Integer), Integer), nil] where
+        #   the slots start, the one comma between them, and the closing `>`
+        def hash_angle_slots(type, tokens, index, name_end)
+          kind, start, open_end = tokens[index]
+          return unless kind == :open && type[start] == '<' && type[name_end...start].to_s.strip.empty?
+
+          depth = 0
+          commas = []
+          tokens.drop(index).each do |token_kind, token_start, token_end|
+            depth += 1 if token_kind == :open
+            depth -= 1 if token_kind == :close
+            commas << [token_start, token_end] if token_kind == :comma && depth == 1
+            next unless depth.zero?
+
+            comma = commas.first
+            return commas.size == 1 && comma ? [open_end, comma, token_start] : nil
+          end
+          nil
+        end
+
+        def parses?(type)
+          parse_type(type)
+          true
+        rescue SyntaxError
+          false
         end
 
         def bad_style

@@ -91,6 +91,10 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         class Foo
           # @param [Hash<Symbol, String>]
           # @param [Hash{Symbol => String; Integer => Float}]
+          # @param [Hash<Symbol, Integer | nil>]
+          # @param [Array<Hash<Symbol, String>>]
+          # @param [Hash<Symbol, Hash<Symbol, String>>]
+          # @param [Hash<'a, b', #to_s>]
           def foo
           end
         end
@@ -215,6 +219,8 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
         class Foo
           # @param [Hash(Symbol)]
           # @param [Array{Symbol => String}]
+          # @param [Hash<Symbol>]
+          # @param [Hash<A, B, C>]
           def foo
           end
         end
@@ -222,8 +228,6 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
     end
 
     it 'rewrites Hash<K, V> to {K => V}' do
-      pending 'short style does not rewrite Hash<K, V> yet'
-
       expect_offense(<<~RUBY)
         class Foo
           # @param [Hash<Symbol, String>]
@@ -236,6 +240,34 @@ RSpec.describe RuboCop::Cop::YARD::CollectionStyle, :config do
       expect_correction(<<~RUBY)
         class Foo
           # @param [{Symbol => String}]
+          def foo
+          end
+        end
+      RUBY
+    end
+
+    it 'rewrites nested Hash<K, V> keeping K and V as written' do
+      expect_offense(<<~RUBY)
+        class Foo
+          # @param [Hash<Symbol, Integer | nil>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash<Symbol, Integer | nil>` is using long style syntax
+          # @param [Array<Hash<Symbol, String>>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Array<Hash<Symbol, String>>` is using long style syntax
+          # @param [Hash<Symbol, Hash<Symbol, String>>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash<Symbol, Hash<Symbol, String>>` is using long style syntax
+          # @param [Hash<'a, b', #to_s>]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Hash<'a, b', #to_s>` is using long style syntax
+          def foo
+          end
+        end
+      RUBY
+
+      expect_correction(<<~RUBY)
+        class Foo
+          # @param [{Symbol => Integer | nil}]
+          # @param [<{Symbol => String}>]
+          # @param [{Symbol => {Symbol => String}}]
+          # @param [{'a, b' => #to_s}]
           def foo
           end
         end
